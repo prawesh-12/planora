@@ -678,15 +678,15 @@ select {
     min-height: 40px;
     padding: 10px 20px;
     border-radius: var(--radius-input);
-    color: #ffffff;
-    background: var(--primary);
+    color: var(--button-text);
+    background: var(--button-bg);
     font-size: 15px;
     font-weight: 600;
 }
 
 .primary-link:hover {
-    color: #ffffff;
-    background: var(--primary-hover);
+    color: var(--button-text);
+    background: var(--button-hover-bg);
     text-decoration: none;
 }
 

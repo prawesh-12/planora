@@ -2,6 +2,7 @@ const express = require("express");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 
+const Org = require("../models/Org");
 const User = require("../models/User");
 const { protect } = require("../middleware/auth");
 
@@ -22,6 +23,31 @@ function toSafeUser(user) {
     createdAt: user.createdAt,
     updatedAt: user.updatedAt,
   };
+}
+
+async function acceptPendingInvitesForUser(user) {
+  const orgs = await Org.find({ invites: user.email });
+  const joinedOrgIds = [];
+
+  for (const org of orgs) {
+    const alreadyMember = org.members.some(
+      (memberId) => memberId.toString() === user._id.toString(),
+    );
+
+    if (!alreadyMember) {
+      org.members.push(user._id);
+      joinedOrgIds.push(org._id);
+    }
+
+    org.invites = org.invites.filter((email) => email !== user.email);
+    await org.save();
+  }
+
+  if (joinedOrgIds.length > 0) {
+    await User.findByIdAndUpdate(user._id, {
+      $addToSet: { orgs: { $each: joinedOrgIds } },
+    });
+  }
 }
 
 router.post("/register", async (req, res) => {
@@ -56,11 +82,15 @@ router.post("/register", async (req, res) => {
       orgs: [],
     });
 
+    await acceptPendingInvitesForUser(user);
+
+    const refreshedUser = await User.findById(user._id);
+
     const token = signToken(user._id);
 
     return res.status(201).json({
       token,
-      user: toSafeUser(user),
+      user: toSafeUser(refreshedUser || user),
     });
   } catch (error) {
     return res.status(500).json({
@@ -99,11 +129,15 @@ router.post("/login", async (req, res) => {
       });
     }
 
+    await acceptPendingInvitesForUser(user);
+
+    const refreshedUser = await User.findById(user._id);
+
     const token = signToken(user._id);
 
     return res.status(200).json({
       token,
-      user: toSafeUser(user),
+      user: toSafeUser(refreshedUser || user),
     });
   } catch (error) {
     return res.status(500).json({
